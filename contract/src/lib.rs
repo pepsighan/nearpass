@@ -1,55 +1,55 @@
-/*
- * This is an example of a Rust smart contract with two simple, symmetric functions:
- *
- * 1. set_greeting: accepts a greeting, such as "howdy", and records it for the user (account_id)
- *    who sent the request
- * 2. get_greeting: accepts an account_id and returns the greeting saved for it, defaulting to
- *    "Hello"
- *
- * Learn more about writing NEAR smart contracts with Rust:
- * https://github.com/near/near-sdk-rs
- *
- */
-
-// To conserve gas, efficient serialization is achieved through Borsh (http://borsh.io/)
+use near_sdk::{AccountId, env, near_bindgen, setup_alloc};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, near_bindgen, setup_alloc};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::{LookupMap, UnorderedSet};
 
 setup_alloc!();
 
-// Structs in Rust are similar to other languages, and may include impl keyword as shown below
-// Note: the names of the structs are not important when calling the smart contract, but the function names are
+/// ID for the Site Password.
+pub type PassId = u64;
+
+/// EncryptedSitePassword is a tuple of Site, Username and Password that is encrypted using
+/// the user's private key. So, nobody is the world except the user itself can view what is stored
+/// in the text.
+pub type EncryptedSitePassword = String;
+
+/// NearPass stores the
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct Welcome {
-    records: LookupMap<String, String>,
+pub struct NearPass {
+    /// Counter for the password id.
+    current_pass_id: PassId,
+    /// Collection of all password Ids for each account.
+    site_password_id_by_account: LookupMap<AccountId, UnorderedSet<PassId>>,
+    /// Collection of all the encrypted passwords by their Ids.
+    site_password: LookupMap<PassId, EncryptedSitePassword>,
 }
 
-impl Default for Welcome {
-  fn default() -> Self {
-    Self {
-      records: LookupMap::new(b"a".to_vec()),
+impl Default for NearPass {
+    fn default() -> Self {
+        Self {
+            current_pass_id: 0,
+            site_password_id_by_account: LookupMap::new(b"a".to_vec())
+            site_password: LookupMap::new(b"b".to_vec()),
+        }
     }
-  }
 }
 
 #[near_bindgen]
-impl Welcome {
+impl NearPass {
     pub fn set_greeting(&mut self, message: String) {
         let account_id = env::signer_account_id();
 
         // Use env::log to record logs permanently to the blockchain!
-        env::log(format!("Saving greeting '{}' for account '{}'", message, account_id,).as_bytes());
+        env::log(format!("Saving greeting '{}' for account '{}'", message, account_id, ).as_bytes());
 
-        self.records.insert(&account_id, &message);
+        self.password_map.insert(&account_id, &message);
     }
 
     // `match` is similar to `switch` in other languages; here we use it to default to "Hello" if
     // self.records.get(&account_id) is not yet defined.
     // Learn more: https://doc.rust-lang.org/book/ch06-02-match.html#matching-with-optiont
     pub fn get_greeting(&self, account_id: String) -> String {
-        match self.records.get(&account_id) {
+        match self.password_map.get(&account_id) {
             Some(greeting) => greeting,
             None => "Hello".to_string(),
         }
@@ -69,9 +69,10 @@ impl Welcome {
  */
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use near_sdk::MockedBlockchain;
     use near_sdk::{testing_env, VMContext};
+    use near_sdk::MockedBlockchain;
+
+    use super::*;
 
     // mock the context for testing, notice "signer_account_id" that was accessed above from env::
     fn get_context(input: Vec<u8>, is_view: bool) -> VMContext {
@@ -99,7 +100,7 @@ mod tests {
     fn set_then_get_greeting() {
         let context = get_context(vec![], false);
         testing_env!(context);
-        let mut contract = Welcome::default();
+        let mut contract = NearPass::default();
         contract.set_greeting("howdy".to_string());
         assert_eq!(
             "howdy".to_string(),
@@ -111,7 +112,7 @@ mod tests {
     fn get_default_greeting() {
         let context = get_context(vec![], true);
         testing_env!(context);
-        let contract = Welcome::default();
+        let contract = NearPass::default();
         // this test did not call set_greeting so should return the default "Hello" greeting
         assert_eq!(
             "Hello".to_string(),
