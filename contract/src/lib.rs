@@ -78,6 +78,22 @@ impl NearPass {
         let mut account_site_passes = account_site_passes.unwrap();
         account_site_passes.insert(&cur_pass_id);
     }
+
+    /// Gets the site password for the account referenced by the pass id.
+    pub fn get_site_password(&self, pass_id: PassId) -> EncryptedSitePassword {
+        let account_id = env::signer_account_id();
+
+        let account = self.site_password_id_by_account.get(&account_id);
+        assert!(account.is_some(), "No site password found");
+
+        let account = account.unwrap();
+        assert!(account.contains(&pass_id), "No site password found");
+
+        let site_pass = self.site_password.get(&pass_id);
+        assert!(site_pass.is_some(), "No site password found");
+
+        site_pass.unwrap()
+    }
 }
 
 /*
