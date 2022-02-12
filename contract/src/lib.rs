@@ -96,6 +96,20 @@ impl NearPass {
 
         site_pass.unwrap()
     }
+
+    /// Updates the pre-existing site password.
+    pub fn update_site_password(&mut self, pass_id: PassId, enc_pass: EncryptedSitePassword) {
+        let account_id = env::signer_account_id();
+
+        let account = self.site_password_id_by_account.get(&account_id);
+        assert!(account.is_some(), "No site password found");
+
+        let account = account.unwrap();
+        assert!(account.contains(&pass_id), "No site password found");
+
+        // Overwrite the pre-existing site password.
+        self.site_password.insert(&pass_id, &enc_pass);
+    }
 }
 
 #[cfg(test)]
@@ -137,5 +151,23 @@ mod tests {
 
         let encrypted_pass = contract.get_site_password(pass_id);
         assert_eq!(encrypted_pass, "encrypted_pass");
+    }
+
+    #[test]
+    fn update_site_password() {
+        let context = get_context(vec![], false);
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        let pass_id = contract.add_site_password("encrypted_pass".to_string());
+
+        let encrypted_pass = contract.get_site_password(pass_id);
+        assert_eq!(encrypted_pass, "encrypted_pass");
+
+        // Update the password.
+        contract.update_site_password(pass_id, "new_encrypted_pass".to_string());
+
+        let new_enc_pass = contract.get_site_password(pass_id);
+        assert_eq!(new_enc_pass, "new_encrypted_pass");
     }
 }
