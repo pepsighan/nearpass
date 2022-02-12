@@ -81,15 +81,28 @@ impl NearPass {
         return cur_pass_id;
     }
 
-    /// Gets the site password for the account referenced by the pass id.
-    pub fn get_site_password(&self, pass_id: PassId) -> EncryptedSitePassword {
-        let account_id = env::signer_account_id();
-
+    /// Panics if the site password is not owned by the account.
+    /// Returns account if it is needed by the caller.
+    fn panic_if_site_password_not_owner(
+        &self,
+        account_id: &AccountId,
+        pass_id: PassId,
+    ) -> UnorderedSet<PassId> {
         let account = self.site_password_id_by_account.get(&account_id);
+        // The error will just respond with a typical 404 error to obfuscate if an account exists
+        // or it owns the password.
         assert!(account.is_some(), "No site password found");
 
         let account = account.unwrap();
         assert!(account.contains(&pass_id), "No site password found");
+
+        account
+    }
+
+    /// Gets the site password for the account referenced by the pass id.
+    pub fn get_site_password(&self, pass_id: PassId) -> EncryptedSitePassword {
+        let account_id = env::signer_account_id();
+        self.panic_if_site_password_not_owner(&account_id, pass_id);
 
         let site_pass = self.site_password.get(&pass_id);
         assert!(site_pass.is_some(), "No site password found");
@@ -100,15 +113,22 @@ impl NearPass {
     /// Updates the pre-existing site password.
     pub fn update_site_password(&mut self, pass_id: PassId, enc_pass: EncryptedSitePassword) {
         let account_id = env::signer_account_id();
-
-        let account = self.site_password_id_by_account.get(&account_id);
-        assert!(account.is_some(), "No site password found");
-
-        let account = account.unwrap();
-        assert!(account.contains(&pass_id), "No site password found");
+        self.panic_if_site_password_not_owner(&account_id, pass_id);
 
         // Overwrite the pre-existing site password.
         self.site_password.insert(&pass_id, &enc_pass);
+    }
+
+    /// Deletes a site password if it exists.
+    pub fn delete_site_password(&mut self, pass_id: PassId) {
+        let account_id = env::signer_account_id();
+        let mut account = self.panic_if_site_password_not_owner(&account_id, pass_id);
+
+        // Remove the password from the account.
+        account.remove(&pass_id);
+
+        // Remove from storage as well.
+        self.site_password.remove(&pass_id);
     }
 }
 
@@ -169,5 +189,24 @@ mod tests {
 
         let new_enc_pass = contract.get_site_password(pass_id);
         assert_eq!(new_enc_pass, "new_encrypted_pass");
+    }
+
+    #[test]
+    #[should_panic(expected = "No site password found")]
+    fn delete_site_password() {
+        let context = get_context(vec![], false);
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        let pass_id = contract.add_site_password("encrypted_pass".to_string());
+
+        let encrypted_pass = contract.get_site_password(pass_id);
+        assert_eq!(encrypted_pass, "encrypted_pass");
+
+        // Delete the password.
+        contract.delete_site_password(pass_id);
+
+        // Check if it is deleted.
+        // contract.get_site_password(pass_id);
     }
 }
