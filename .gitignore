@@ -14,6 +14,10 @@
 
 # production
 /build
+/.cache
+/dist
+/contract/.cargo
+/contract/target
 
 # misc
 .DS_Store
