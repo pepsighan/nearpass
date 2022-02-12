@@ -49,7 +49,7 @@ impl Default for NearPass {
 #[near_bindgen]
 impl NearPass {
     /// Add a site password for the account.
-    pub fn add_site_password(&mut self, enc_pass: EncryptedSitePassword) {
+    pub fn add_site_password(&mut self, enc_pass: EncryptedSitePassword) -> PassId {
         let account_id = env::signer_account_id();
         env::log(format!("Add a site password for account '{}'", account_id).as_bytes());
 
@@ -77,6 +77,8 @@ impl NearPass {
         // Record the new site password for the account.
         let mut account_site_passes = account_site_passes.unwrap();
         account_site_passes.insert(&cur_pass_id);
+
+        return cur_pass_id;
     }
 
     /// Gets the site password for the account referenced by the pass id.
@@ -96,17 +98,6 @@ impl NearPass {
     }
 }
 
-/*
- * The rest of this file holds the inline tests for the code above
- * Learn more about Rust tests: https://doc.rust-lang.org/book/ch11-01-writing-tests.html
- *
- * To run from contract directory:
- * cargo test -- --nocapture
- *
- * From project root, to run in combination with frontend tests:
- * yarn test
- *
- */
 #[cfg(test)]
 mod tests {
     use near_sdk::MockedBlockchain;
@@ -137,10 +128,14 @@ mod tests {
     }
 
     #[test]
-    fn set_then_get_greeting() {
+    fn add_site_password() {
         let context = get_context(vec![], false);
         testing_env!(context);
+
         let mut contract = NearPass::default();
-        contract.add_site_password("encrypted_pass".to_string());
+        let pass_id = contract.add_site_password("encrypted_pass".to_string());
+
+        let encrypted_pass = contract.get_site_password(pass_id);
+        assert_eq!(encrypted_pass, "encrypted_pass");
     }
 }
