@@ -1,6 +1,8 @@
-use near_sdk::{AccountId, env, near_bindgen, setup_alloc};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet};
+use near_sdk::{env, near_bindgen, setup_alloc, AccountId, CryptoHash};
+
+mod hash;
 
 setup_alloc!();
 
@@ -24,35 +26,57 @@ pub struct NearPass {
     site_password: LookupMap<PassId, EncryptedSitePassword>,
 }
 
+/// Helper structure for keys of the persistent collections.
+#[derive(BorshSerialize)]
+pub enum StorageKey {
+    SitePasswordIdByAccount,
+    SitePasswordIdByAccountInner { account_id_hash: CryptoHash },
+    SitePassword,
+}
+
 impl Default for NearPass {
     fn default() -> Self {
         Self {
             current_pass_id: 0,
-            site_password_id_by_account: LookupMap::new(b"a".to_vec())
-            site_password: LookupMap::new(b"b".to_vec()),
+            site_password_id_by_account: LookupMap::new(
+                StorageKey::SitePasswordIdByAccount.try_to_vec().unwrap(),
+            ),
+            site_password: LookupMap::new(StorageKey::SitePassword.try_to_vec().unwrap()),
         }
     }
 }
 
 #[near_bindgen]
 impl NearPass {
-    pub fn set_greeting(&mut self, message: String) {
+    /// Add a site password for the account.
+    pub fn add_site_password(&mut self, enc_pass: EncryptedSitePassword) {
         let account_id = env::signer_account_id();
+        env::log(format!("Add a site password for account '{}'", account_id).as_bytes());
 
-        // Use env::log to record logs permanently to the blockchain!
-        env::log(format!("Saving greeting '{}' for account '{}'", message, account_id, ).as_bytes());
+        let cur_pass_id = self.current_pass_id;
+        self.current_pass_id += 1;
 
-        self.password_map.insert(&account_id, &message);
-    }
+        // Add the site password.
+        self.site_password.insert(&cur_pass_id, &enc_pass);
 
-    // `match` is similar to `switch` in other languages; here we use it to default to "Hello" if
-    // self.records.get(&account_id) is not yet defined.
-    // Learn more: https://doc.rust-lang.org/book/ch06-02-match.html#matching-with-optiont
-    pub fn get_greeting(&self, account_id: String) -> String {
-        match self.password_map.get(&account_id) {
-            Some(greeting) => greeting,
-            None => "Hello".to_string(),
+        let mut account_site_passes = self.site_password_id_by_account.get(&account_id);
+
+        // If the account id is not present, create one.
+        if account_site_passes.is_none() {
+            account_site_passes = Option::Some(UnorderedSet::new(
+                StorageKey::SitePasswordIdByAccountInner {
+                    account_id_hash: hash::hash_account_id(&account_id),
+                }
+                .try_to_vec()
+                .unwrap(),
+            ));
+            self.site_password_id_by_account
+                .insert(&account_id, account_site_passes.as_ref().unwrap());
         }
+
+        // Record the new site password for the account.
+        let mut account_site_passes = account_site_passes.unwrap();
+        account_site_passes.insert(&cur_pass_id);
     }
 }
 
@@ -69,8 +93,8 @@ impl NearPass {
  */
 #[cfg(test)]
 mod tests {
-    use near_sdk::{testing_env, VMContext};
     use near_sdk::MockedBlockchain;
+    use near_sdk::{testing_env, VMContext};
 
     use super::*;
 
@@ -101,22 +125,6 @@ mod tests {
         let context = get_context(vec![], false);
         testing_env!(context);
         let mut contract = NearPass::default();
-        contract.set_greeting("howdy".to_string());
-        assert_eq!(
-            "howdy".to_string(),
-            contract.get_greeting("bob_near".to_string())
-        );
-    }
-
-    #[test]
-    fn get_default_greeting() {
-        let context = get_context(vec![], true);
-        testing_env!(context);
-        let contract = NearPass::default();
-        // this test did not call set_greeting so should return the default "Hello" greeting
-        assert_eq!(
-            "Hello".to_string(),
-            contract.get_greeting("francis.near".to_string())
-        );
+        contract.add_site_password("encrypted_pass".to_string());
     }
 }
