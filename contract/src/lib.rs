@@ -136,6 +136,24 @@ impl NearPass {
         let account_id = env::signer_account_id();
         self.site_password_id_by_account.get(&account_id)
     }
+
+    /// Gets all the encrypted passwords for the given ids for an account.
+    pub fn get_site_passwords_by_ids(&self, pass_ids: Vec<PassId>) -> Vec<EncryptedSitePassword> {
+        let account_id = env::signer_account_id();
+
+        let account = self.site_password_id_by_account.get(&account_id);
+        assert!(account.is_some(), "No site password found");
+        let account = account.unwrap();
+
+        // Check if all the pass_ids that are sent in the request are owned by the account.
+        let all_owned = pass_ids.iter().all(|it| account.contains(it));
+        assert!(all_owned, "No site password found");
+
+        pass_ids
+            .iter()
+            .map(|it| self.site_password.get(it).unwrap())
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -231,5 +249,18 @@ mod tests {
         assert!(all_password_ids.contains(&0));
         assert!(all_password_ids.contains(&1));
         assert!(!all_password_ids.contains(&2));
+    }
+
+    #[test]
+    fn get_site_passwords_by_ids() {
+        let context = get_context(vec![], false);
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        contract.add_site_password("encrypted_pass".to_string());
+        contract.add_site_password("new_encrypted_pass".to_string());
+
+        let enc_passes = contract.get_site_passwords_by_ids(vec![0, 1]);
+        assert_eq!(enc_passes, vec!["encrypted_pass", "new_encrypted_pass"]);
     }
 }
