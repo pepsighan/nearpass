@@ -130,6 +130,12 @@ impl NearPass {
         // Remove from storage as well.
         self.site_password.remove(&pass_id);
     }
+
+    /// Gets all the password ids for a given account.
+    pub fn get_all_site_password_ids(&self) -> Option<LookupSet<PassId>> {
+        let account_id = env::signer_account_id();
+        self.site_password_id_by_account.get(&account_id)
+    }
 }
 
 #[cfg(test)]
@@ -208,5 +214,22 @@ mod tests {
 
         // Check if it is deleted.
         contract.get_site_password(pass_id);
+    }
+
+    #[test]
+    fn get_all_site_password_ids() {
+        let context = get_context(vec![], false);
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        contract.add_site_password("encrypted_pass".to_string());
+        contract.add_site_password("new_encrypted_pass".to_string());
+
+        let all_password_ids = contract.get_all_site_password_ids();
+        assert!(all_password_ids.is_some());
+        let all_password_ids = all_password_ids.unwrap();
+        assert!(all_password_ids.contains(&0));
+        assert!(all_password_ids.contains(&1));
+        assert!(!all_password_ids.contains(&2));
     }
 }
