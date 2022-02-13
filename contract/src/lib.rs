@@ -1,5 +1,5 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedSet};
+use near_sdk::collections::{LookupMap, LookupSet};
 use near_sdk::{env, near_bindgen, setup_alloc, AccountId, CryptoHash};
 
 mod hash;
@@ -21,7 +21,7 @@ pub struct NearPass {
     /// Counter for the password id.
     current_pass_id: PassId,
     /// Collection of all password Ids for each account.
-    site_password_id_by_account: LookupMap<AccountId, UnorderedSet<PassId>>,
+    site_password_id_by_account: LookupMap<AccountId, LookupSet<PassId>>,
     /// Collection of all the encrypted passwords by their Ids.
     site_password: LookupMap<PassId, EncryptedSitePassword>,
 }
@@ -63,7 +63,7 @@ impl NearPass {
 
         // If the account id is not present, create one.
         if account_site_passes.is_none() {
-            account_site_passes = Option::Some(UnorderedSet::new(
+            account_site_passes = Option::Some(LookupSet::new(
                 StorageKey::SitePasswordIdByAccountInner {
                     account_id_hash: hash::hash_account_id(&account_id),
                 }
@@ -87,7 +87,7 @@ impl NearPass {
         &self,
         account_id: &AccountId,
         pass_id: PassId,
-    ) -> UnorderedSet<PassId> {
+    ) -> LookupSet<PassId> {
         let account = self.site_password_id_by_account.get(&account_id);
         // The error will just respond with a typical 404 error to obfuscate if an account exists
         // or it owns the password.
@@ -207,6 +207,6 @@ mod tests {
         contract.delete_site_password(pass_id);
 
         // Check if it is deleted.
-        // contract.get_site_password(pass_id);
+        contract.get_site_password(pass_id);
     }
 }
