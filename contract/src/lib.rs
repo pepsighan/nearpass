@@ -153,9 +153,11 @@ impl NearPass {
     }
 
     /// Gets all the password ids for a given account.
-    pub fn get_all_site_password_ids(&self) -> Option<LookupSet<PassId>> {
+    pub fn get_all_site_password_ids(&self) -> Option<Vec<u8>> {
         let account_id = env::signer_account_id();
-        self.site_password_id_by_account.get(&account_id)
+        self.site_password_id_by_account
+            .get(&account_id)
+            .map(|it| it.try_to_vec().unwrap())
     }
 
     /// Gets all the encrypted passwords for the given ids for an account.
