@@ -57,14 +57,20 @@ impl NearPass {
     pub fn initialize_account_hash(&mut self, hash: String) {
         let account_id = env::signer_account_id();
         let saved_hash = self.account_hash.get(&account_id);
-        assert!(saved_hash.is_none(), "Cannot re-initialize account hash");
+        assert!(
+            saved_hash.is_none(),
+            "NearpassAlreadyInitialized: Cannot re-initialize account hash"
+        );
         self.account_hash.insert(&account_id, &hash);
     }
 
     /// Gets the hash for the account.
     pub fn get_account_hash(&self, account_id: String) -> String {
         let hash = self.account_hash.get(&account_id);
-        assert!(hash.is_some(), "Account hash not initialized yet");
+        assert!(
+            hash.is_some(),
+            "NearpassAccountNotInitialized: Account hash not initialized yet"
+        );
         hash.unwrap()
     }
 
@@ -111,10 +117,16 @@ impl NearPass {
         let account = self.site_password_id_by_account.get(&account_id);
         // The error will just respond with a typical 404 error to obfuscate if an account exists
         // or it owns the password.
-        assert!(account.is_some(), "No site password found");
+        assert!(
+            account.is_some(),
+            "NearpassNoSitePass: No site password found"
+        );
 
         let account = account.unwrap();
-        assert!(account.contains(&pass_id), "No site password found");
+        assert!(
+            account.contains(&pass_id),
+            "NearpassNoSitePass: No site password found"
+        );
 
         account
     }
@@ -124,7 +136,10 @@ impl NearPass {
         self.panic_if_site_password_not_owner(&account_id, pass_id);
 
         let site_pass = self.site_password.get(&pass_id);
-        assert!(site_pass.is_some(), "No site password found");
+        assert!(
+            site_pass.is_some(),
+            "NearpassNoSitePass: No site password found"
+        );
 
         site_pass.unwrap()
     }
@@ -164,12 +179,15 @@ impl NearPass {
         pass_ids: Vec<PassId>,
     ) -> Vec<EncryptedSitePassword> {
         let account = self.site_password_id_by_account.get(&account_id);
-        assert!(account.is_some(), "No site password found");
+        assert!(
+            account.is_some(),
+            "NearpassNoSitePass: No site password found"
+        );
         let account = account.unwrap();
 
         // Check if all the pass_ids that are sent in the request are owned by the account.
         let all_owned = pass_ids.iter().all(|it| account.contains(it));
-        assert!(all_owned, "No site password found");
+        assert!(all_owned, "NearpassNoSitePass: No site password found");
 
         pass_ids
             .iter()
