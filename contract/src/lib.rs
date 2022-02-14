@@ -24,6 +24,9 @@ pub struct NearPass {
     site_password_id_by_account: LookupMap<AccountId, LookupSet<PassId>>,
     /// Collection of all the encrypted passwords by their Ids.
     site_password: LookupMap<PassId, EncryptedSitePassword>,
+    /// Hashes of the accounts to verify what master password they used to encrypt
+    /// site passwords.
+    account_hash: LookupMap<AccountId, String>,
 }
 
 /// Helper structure for keys of the persistent collections.
@@ -32,6 +35,7 @@ pub enum StorageKey {
     SitePasswordIdByAccount,
     SitePasswordIdByAccountInner { account_id_hash: CryptoHash },
     SitePassword,
+    AccountHash,
 }
 
 impl Default for NearPass {
@@ -42,12 +46,21 @@ impl Default for NearPass {
                 StorageKey::SitePasswordIdByAccount.try_to_vec().unwrap(),
             ),
             site_password: LookupMap::new(StorageKey::SitePassword.try_to_vec().unwrap()),
+            account_hash: LookupMap::new(StorageKey::AccountHash.try_to_vec().unwrap()),
         }
     }
 }
 
 #[near_bindgen]
 impl NearPass {
+    /// Initializes the account hash for the very first time. Does not update once initialized.
+    pub fn initialize_account_hash(&mut self, hash: String) {
+        let account_id = env::signer_account_id();
+        let hashes = self.account_hash.get(&account_id);
+        assert!(hashes.is_none(), "Cannot re-initialize account hash");
+        self.account_hash.insert(&account_id, &hash);
+    }
+
     /// Add a site password for the account.
     pub fn add_site_password(&mut self, enc_pass: EncryptedSitePassword) -> PassId {
         let account_id = env::signer_account_id();
