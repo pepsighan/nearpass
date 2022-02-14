@@ -56,9 +56,17 @@ impl NearPass {
     /// Initializes the account hash for the very first time. Does not update once initialized.
     pub fn initialize_account_hash(&mut self, hash: String) {
         let account_id = env::signer_account_id();
-        let hashes = self.account_hash.get(&account_id);
-        assert!(hashes.is_none(), "Cannot re-initialize account hash");
+        let saved_hash = self.account_hash.get(&account_id);
+        assert!(saved_hash.is_none(), "Cannot re-initialize account hash");
         self.account_hash.insert(&account_id, &hash);
+    }
+
+    /// Gets the hash for the account.
+    pub fn get_account_hash(&self) -> String {
+        let account_id = env::signer_account_id();
+        let hash = self.account_hash.get(&account_id);
+        assert!(hash.is_some(), "Account hash not initialized yet");
+        hash.unwrap()
     }
 
     /// Add a site password for the account.
