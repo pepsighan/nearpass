@@ -226,6 +226,29 @@ mod tests {
     }
 
     #[test]
+    fn initialize_account_hash() {
+        let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        contract.initialize_account_hash("hash".to_string());
+        let hash = contract.get_account_hash(accound_id);
+        assert_eq!(hash, "hash");
+    }
+
+    #[test]
+    #[should_panic(expected = "NearpassAccountNotInitialized: Account hash not initialized yet")]
+    fn get_account_hash_for_nonexistent_account() {
+        let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        contract.get_account_hash(accound_id);
+    }
+
+    #[test]
     fn add_site_password() {
         let context = get_context(vec![], false);
         let accound_id = context.signer_account_id.to_string();
@@ -258,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "No site password found")]
+    #[should_panic(expected = "NearpassNoSitePass: No site password found")]
     fn delete_site_password() {
         let context = get_context(vec![], false);
         let accound_id = context.signer_account_id.to_string();
