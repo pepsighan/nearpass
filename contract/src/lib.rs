@@ -62,8 +62,7 @@ impl NearPass {
     }
 
     /// Gets the hash for the account.
-    pub fn get_account_hash(&self) -> String {
-        let account_id = env::signer_account_id();
+    pub fn get_account_hash(&self, account_id: String) -> String {
         let hash = self.account_hash.get(&account_id);
         assert!(hash.is_some(), "Account hash not initialized yet");
         hash.unwrap()
@@ -121,8 +120,7 @@ impl NearPass {
     }
 
     /// Gets the site password for the account referenced by the pass id.
-    pub fn get_site_password(&self, pass_id: PassId) -> EncryptedSitePassword {
-        let account_id = env::signer_account_id();
+    pub fn get_site_password(&self, account_id: String, pass_id: PassId) -> EncryptedSitePassword {
         self.panic_if_site_password_not_owner(&account_id, pass_id);
 
         let site_pass = self.site_password.get(&pass_id);
@@ -153,17 +151,18 @@ impl NearPass {
     }
 
     /// Gets all the password ids for a given account.
-    pub fn get_all_site_password_ids(&self) -> Option<Vec<u8>> {
-        let account_id = env::signer_account_id();
+    pub fn get_all_site_password_ids(&self, account_id: String) -> Option<Vec<u8>> {
         self.site_password_id_by_account
             .get(&account_id)
             .map(|it| it.try_to_vec().unwrap())
     }
 
     /// Gets all the encrypted passwords for the given ids for an account.
-    pub fn get_site_passwords_by_ids(&self, pass_ids: Vec<PassId>) -> Vec<EncryptedSitePassword> {
-        let account_id = env::signer_account_id();
-
+    pub fn get_site_passwords_by_ids(
+        &self,
+        account_id: String,
+        pass_ids: Vec<PassId>,
+    ) -> Vec<EncryptedSitePassword> {
         let account = self.site_password_id_by_account.get(&account_id);
         assert!(account.is_some(), "No site password found");
         let account = account.unwrap();
@@ -211,30 +210,32 @@ mod tests {
     #[test]
     fn add_site_password() {
         let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
         let mut contract = NearPass::default();
         let pass_id = contract.add_site_password("encrypted_pass".to_string());
 
-        let encrypted_pass = contract.get_site_password(pass_id);
+        let encrypted_pass = contract.get_site_password(accound_id, pass_id);
         assert_eq!(encrypted_pass, "encrypted_pass");
     }
 
     #[test]
     fn update_site_password() {
         let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
         let mut contract = NearPass::default();
         let pass_id = contract.add_site_password("encrypted_pass".to_string());
 
-        let encrypted_pass = contract.get_site_password(pass_id);
+        let encrypted_pass = contract.get_site_password(accound_id.clone(), pass_id);
         assert_eq!(encrypted_pass, "encrypted_pass");
 
         // Update the password.
         contract.update_site_password(pass_id, "new_encrypted_pass".to_string());
 
-        let new_enc_pass = contract.get_site_password(pass_id);
+        let new_enc_pass = contract.get_site_password(accound_id, pass_id);
         assert_eq!(new_enc_pass, "new_encrypted_pass");
     }
 
@@ -242,31 +243,33 @@ mod tests {
     #[should_panic(expected = "No site password found")]
     fn delete_site_password() {
         let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
         let mut contract = NearPass::default();
         let pass_id = contract.add_site_password("encrypted_pass".to_string());
 
-        let encrypted_pass = contract.get_site_password(pass_id);
+        let encrypted_pass = contract.get_site_password(accound_id.clone(), pass_id);
         assert_eq!(encrypted_pass, "encrypted_pass");
 
         // Delete the password.
         contract.delete_site_password(pass_id);
 
         // Check if it is deleted.
-        contract.get_site_password(pass_id);
+        contract.get_site_password(accound_id, pass_id);
     }
 
     #[test]
     fn get_all_site_password_ids() {
         let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
         let mut contract = NearPass::default();
         contract.add_site_password("encrypted_pass".to_string());
         contract.add_site_password("new_encrypted_pass".to_string());
 
-        let all_password_ids = contract.get_all_site_password_ids();
+        let all_password_ids = contract.get_all_site_password_ids(accound_id);
         assert!(all_password_ids.is_some());
         let all_password_ids = all_password_ids.unwrap();
         assert!(all_password_ids.contains(&0));
@@ -277,13 +280,14 @@ mod tests {
     #[test]
     fn get_site_passwords_by_ids() {
         let context = get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
         let mut contract = NearPass::default();
         contract.add_site_password("encrypted_pass".to_string());
         contract.add_site_password("new_encrypted_pass".to_string());
 
-        let enc_passes = contract.get_site_passwords_by_ids(vec![0, 1]);
+        let enc_passes = contract.get_site_passwords_by_ids(accound_id, vec![0, 1]);
         assert_eq!(enc_passes, vec!["encrypted_pass", "new_encrypted_pass"]);
     }
 }
