@@ -244,7 +244,7 @@ mod tests {
         let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
-        let mut contract = NearPass::default();
+        let contract = NearPass::default();
         contract.get_account_hash(accound_id);
     }
 
