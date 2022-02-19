@@ -174,7 +174,7 @@ impl NearPass {
 
     /// Panics if the site password is not owned by the account.
     /// Returns account if it is needed by the caller.
-    fn panic_if_site_password_not_owner(
+    fn panic_if_account_invalid_for_site_password(
         &self,
         account_id: &AccountId,
         pass_id: DataId,
@@ -198,7 +198,7 @@ impl NearPass {
 
     /// Gets the site password for the account referenced by the pass id.
     pub fn get_site_password(&self, account_id: String, pass_id: DataId) -> EncryptedData {
-        self.panic_if_site_password_not_owner(&account_id, pass_id);
+        self.panic_if_account_invalid_for_site_password(&account_id, pass_id);
 
         let site_pass = self.data_map.get(&pass_id);
         assert!(
@@ -212,7 +212,7 @@ impl NearPass {
     /// Updates the pre-existing site password.
     pub fn update_site_password(&mut self, pass_id: DataId, enc_pass: EncryptedData) {
         let account_id = env::signer_account_id();
-        self.panic_if_site_password_not_owner(&account_id, pass_id);
+        self.panic_if_account_invalid_for_site_password(&account_id, pass_id);
 
         // Overwrite the pre-existing site password.
         self.data_map.insert(&pass_id, &enc_pass);
@@ -221,7 +221,7 @@ impl NearPass {
     /// Deletes a site password if it exists.
     pub fn delete_site_password(&mut self, pass_id: DataId) {
         let account_id = env::signer_account_id();
-        let mut account = self.panic_if_site_password_not_owner(&account_id, pass_id);
+        let mut account = self.panic_if_account_invalid_for_site_password(&account_id, pass_id);
 
         // Remove the password from the account.
         account.remove(&pass_id);
