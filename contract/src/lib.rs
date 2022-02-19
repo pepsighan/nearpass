@@ -6,29 +6,32 @@ mod hash;
 
 setup_alloc!();
 
-/// ID for the Site Password.
-pub type PassId = u64;
+/// ID for the data.
+pub type DataId = u64;
 
-/// EncryptedSitePassword is a tuple of Site, Username and Password that is encrypted using
-/// the user's private key. So, nobody is the world except the user itself can view what is stored
-/// in the text.
-pub type EncryptedSitePassword = String;
+/// EncryptedData is a text that is encrypted using the user's encryption key. So, nobody is
+/// the world except the user itself can view what is stored in the text.
+pub type EncryptedData = String;
 
 /// NearPass stores the
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct NearPass {
-    /// Counter for the password id.
-    current_pass_id: PassId,
-    /// Collection of all password Ids for each account.
+    /// Counter for the data id.
+    current_data_id: DataId,
+    /// Collection of all password ids for each account.
     /// Using LookupMap to store a list of PassId instead of UnorderedSet because
     /// UnorderedSet does not iterate properly due to: https://github.com/near/near-sdk-rs/issues/733.
-    site_password_id_by_account: LookupMap<AccountId, LookupMap<u64, PassId>>,
+    site_password_id_by_account: LookupMap<AccountId, LookupMap<u64, DataId>>,
     /// Stores the count of password ids for each account. Need to store this because of reasons
     /// above.
-    site_password_id_by_account_count: LookupMap<AccountId, u64>,
-    /// Collection of all the encrypted passwords by their Ids.
-    site_password: LookupMap<PassId, EncryptedSitePassword>,
+    count_site_password_id_by_account: LookupMap<AccountId, u64>,
+    /// Collection of all text data ids for each account.
+    text_id_by_account: LookupMap<AccountId, LookupMap<u64, DataId>>,
+    /// Stores the count of text ids for each account.
+    count_text_id_by_account: LookupMap<AccountId, u64>,
+    /// Collection of all the encrypted data by their ids.
+    data_map: LookupMap<DataId, EncryptedData>,
     /// Signatures of the accounts to verify to verify if an encryption key is associated with an
     /// account.
     account_signature: LookupMap<AccountId, String>,
@@ -39,24 +42,31 @@ pub struct NearPass {
 pub enum StorageKey {
     SitePasswordIdByAccount,
     SitePasswordIdByAccountInner { account_id_hash: CryptoHash },
-    SitePasswordIdByAccountCount,
-    SitePassword,
+    CountSitePasswordIdByAccount,
+    TextIdByAccount,
+    TextIdByAccountInner { account_id_hash: CryptoHash },
+    CountTextIdByAccount,
+    DataMap,
     AccountSignature,
 }
 
 impl Default for NearPass {
     fn default() -> Self {
         Self {
-            current_pass_id: 0,
+            current_data_id: 0,
             site_password_id_by_account: LookupMap::new(
                 StorageKey::SitePasswordIdByAccount.try_to_vec().unwrap(),
             ),
-            site_password_id_by_account_count: LookupMap::new(
-                StorageKey::SitePasswordIdByAccountCount
+            count_site_password_id_by_account: LookupMap::new(
+                StorageKey::CountSitePasswordIdByAccount
                     .try_to_vec()
                     .unwrap(),
             ),
-            site_password: LookupMap::new(StorageKey::SitePassword.try_to_vec().unwrap()),
+            text_id_by_account: LookupMap::new(StorageKey::TextIdByAccount.try_to_vec().unwrap()),
+            count_text_id_by_account: LookupMap::new(
+                StorageKey::CountTextIdByAccount.try_to_vec().unwrap(),
+            ),
+            data_map: LookupMap::new(StorageKey::DataMap.try_to_vec().unwrap()),
             account_signature: LookupMap::new(StorageKey::AccountSignature.try_to_vec().unwrap()),
         }
     }
@@ -86,19 +96,19 @@ impl NearPass {
     }
 
     /// Add a site password for the account.
-    pub fn add_site_password(&mut self, enc_pass: EncryptedSitePassword) -> PassId {
+    pub fn add_site_password(&mut self, enc_pass: EncryptedData) -> DataId {
         let account_id = env::signer_account_id();
         env::log(format!("Add a site password for account '{}'", account_id).as_bytes());
 
-        let cur_pass_id = self.current_pass_id;
-        self.current_pass_id += 1;
+        let cur_pass_id = self.current_data_id;
+        self.current_data_id += 1;
 
         // Add the site password.
-        self.site_password.insert(&cur_pass_id, &enc_pass);
+        self.data_map.insert(&cur_pass_id, &enc_pass);
 
         let mut account_site_passes = self.site_password_id_by_account.get(&account_id);
         let site_pass_count = self
-            .site_password_id_by_account_count
+            .count_site_password_id_by_account
             .get(&account_id)
             .unwrap_or(0);
 
@@ -119,7 +129,7 @@ impl NearPass {
         let mut account_site_passes = account_site_passes.unwrap();
         account_site_passes.insert(&site_pass_count, &cur_pass_id);
         // Increment the count.
-        self.site_password_id_by_account_count
+        self.count_site_password_id_by_account
             .insert(&account_id, &(site_pass_count + 1));
 
         return cur_pass_id;
@@ -130,8 +140,8 @@ impl NearPass {
     fn panic_if_site_password_not_owner(
         &self,
         account_id: &AccountId,
-        pass_id: PassId,
-    ) -> LookupMap<u64, PassId> {
+        pass_id: DataId,
+    ) -> LookupMap<u64, DataId> {
         let account = self.site_password_id_by_account.get(&account_id);
         // The error will just respond with a typical 404 error to obfuscate if an account exists
         // or it owns the password.
@@ -150,10 +160,10 @@ impl NearPass {
     }
 
     /// Gets the site password for the account referenced by the pass id.
-    pub fn get_site_password(&self, account_id: String, pass_id: PassId) -> EncryptedSitePassword {
+    pub fn get_site_password(&self, account_id: String, pass_id: DataId) -> EncryptedData {
         self.panic_if_site_password_not_owner(&account_id, pass_id);
 
-        let site_pass = self.site_password.get(&pass_id);
+        let site_pass = self.data_map.get(&pass_id);
         assert!(
             site_pass.is_some(),
             "NearpassNoSitePass: No site password found"
@@ -163,16 +173,16 @@ impl NearPass {
     }
 
     /// Updates the pre-existing site password.
-    pub fn update_site_password(&mut self, pass_id: PassId, enc_pass: EncryptedSitePassword) {
+    pub fn update_site_password(&mut self, pass_id: DataId, enc_pass: EncryptedData) {
         let account_id = env::signer_account_id();
         self.panic_if_site_password_not_owner(&account_id, pass_id);
 
         // Overwrite the pre-existing site password.
-        self.site_password.insert(&pass_id, &enc_pass);
+        self.data_map.insert(&pass_id, &enc_pass);
     }
 
     /// Deletes a site password if it exists.
-    pub fn delete_site_password(&mut self, pass_id: PassId) {
+    pub fn delete_site_password(&mut self, pass_id: DataId) {
         let account_id = env::signer_account_id();
         let mut account = self.panic_if_site_password_not_owner(&account_id, pass_id);
 
@@ -180,14 +190,14 @@ impl NearPass {
         account.remove(&pass_id);
 
         // Remove from storage as well.
-        self.site_password.remove(&pass_id);
+        self.data_map.remove(&pass_id);
     }
 
     /// Gets all the password ids for a given account.
-    pub fn get_all_site_password_ids(&self, account_id: String) -> Option<Vec<PassId>> {
+    pub fn get_all_site_password_ids(&self, account_id: String) -> Option<Vec<DataId>> {
         let pass_ids = self.site_password_id_by_account.get(&account_id)?;
         let pass_id_count = self
-            .site_password_id_by_account_count
+            .count_site_password_id_by_account
             .get(&account_id)
             .unwrap_or(0);
 
@@ -203,8 +213,8 @@ impl NearPass {
     pub fn get_site_passwords_by_ids(
         &self,
         account_id: String,
-        pass_ids: Vec<PassId>,
-    ) -> Vec<EncryptedSitePassword> {
+        pass_ids: Vec<DataId>,
+    ) -> Vec<EncryptedData> {
         let account = self.site_password_id_by_account.get(&account_id);
         assert!(
             account.is_some(),
@@ -218,7 +228,7 @@ impl NearPass {
 
         pass_ids
             .iter()
-            .map(|it| self.site_password.get(it).unwrap())
+            .map(|it| self.data_map.get(it).unwrap())
             .collect()
     }
 }
