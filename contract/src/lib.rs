@@ -163,6 +163,8 @@ impl NearPass {
 
         // Remove the password from the account.
         account.remove(&pass_id);
+        self.site_password_id_by_account
+            .insert(&account_id, &account);
 
         // Remove from storage as well.
         self.data_map.remove(&pass_id);
@@ -270,6 +272,7 @@ impl NearPass {
 
         // Remove the text from the account.
         account.remove(&text_id);
+        self.text_id_by_account.insert(&account_id, &account);
 
         // Remove from storage as well.
         self.data_map.remove(&text_id);
