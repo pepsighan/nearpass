@@ -7,7 +7,7 @@ use crate::{hash, near_blockchain, DataId, EncryptedData, NearPass, NearPassCont
 #[near_bindgen]
 impl NearPass {
     /// Add a text for the account.
-    pub fn add_text(&mut self, enc_data: EncryptedData) -> DataId {
+    pub fn add_text(&mut self, enc_text: EncryptedData) -> DataId {
         let account_id = env::signer_account_id();
         env::log(format!("Add a text for account '{}'", account_id).as_bytes());
 
@@ -15,7 +15,7 @@ impl NearPass {
         self.current_data_id += 1;
 
         // Add the site password.
-        self.data_map.insert(&cur_data_id, &enc_data);
+        self.data_map.insert(&cur_data_id, &enc_text);
 
         let mut acc_text_ids = self.text_id_by_account.get(&account_id);
         let cur_text_index = self.count_text_id_by_account.get(&account_id).unwrap_or(0);
