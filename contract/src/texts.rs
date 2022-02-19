@@ -1,8 +1,8 @@
 use near_sdk::borsh::BorshSerialize;
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::UnorderedSet;
 use near_sdk::{env, near_bindgen, AccountId};
 
-use crate::{hash, near_blockchain, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
+use crate::{hash, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
 
 #[near_bindgen]
 impl NearPass {
@@ -18,27 +18,22 @@ impl NearPass {
         self.data_map.insert(&cur_data_id, &enc_text);
 
         let mut acc_text_ids = self.text_id_by_account.get(&account_id);
-        let cur_text_index = self.count_text_id_by_account.get(&account_id).unwrap_or(0);
 
         // If the account id is not present, create one.
         if acc_text_ids.is_none() {
-            acc_text_ids = Option::Some(LookupMap::new(
+            acc_text_ids = Option::Some(UnorderedSet::new(
                 StorageKey::TextIdByAccountInner {
                     account_id_hash: hash::hash_account_id(&account_id),
                 }
                 .try_to_vec()
                 .unwrap(),
             ));
-            self.text_id_by_account
-                .insert(&account_id, acc_text_ids.as_ref().unwrap());
         }
 
         // Record a new text for the account.
         let mut acc_text_ids = acc_text_ids.unwrap();
-        acc_text_ids.insert(&cur_text_index, &cur_data_id);
-        // Increment the count.
-        self.count_text_id_by_account
-            .insert(&account_id, &(cur_text_index + 1));
+        acc_text_ids.insert(&cur_data_id);
+        self.text_id_by_account.insert(&account_id, &acc_text_ids);
 
         return cur_data_id;
     }
@@ -48,15 +43,12 @@ impl NearPass {
         &self,
         account_id: &AccountId,
         text_id: DataId,
-    ) -> LookupMap<u64, DataId> {
+    ) -> UnorderedSet<DataId> {
         let account = self.text_id_by_account.get(&account_id);
         assert!(account.is_some(), "NearpassNoText: No text found");
 
         let account = account.unwrap();
-        assert!(
-            account.get(&text_id).is_some(),
-            "NearpassNoText: No text found"
-        );
+        assert!(account.contains(&text_id), "NearpassNoText: No text found");
 
         account
     }
@@ -95,14 +87,7 @@ impl NearPass {
     /// Gets all the text ids for a given account.
     pub fn get_all_text_ids(&self, account_id: String) -> Option<Vec<DataId>> {
         let text_ids = self.text_id_by_account.get(&account_id)?;
-        let text_id_count = self.count_text_id_by_account.get(&account_id).unwrap_or(0);
-
-        Some(
-            (0..text_id_count)
-                .into_iter()
-                .map(|index| text_ids.get(&index).unwrap())
-                .collect(),
-        )
+        Some(text_ids.to_vec())
     }
 
     /// Gets all the text for the given ids for an account.
@@ -116,7 +101,7 @@ impl NearPass {
         let account = account.unwrap();
 
         // Check if all the text ids that are sent in the request are owned by the account.
-        let all_owned = text_ids.iter().all(|it| account.get(it).is_some());
+        let all_owned = text_ids.iter().all(|it| account.contains(it));
         assert!(all_owned, "NearpassNoText: No text found");
 
         text_ids

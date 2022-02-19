@@ -1,8 +1,8 @@
 use near_sdk::borsh::BorshSerialize;
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::UnorderedSet;
 use near_sdk::{env, near_bindgen, AccountId};
 
-use crate::{hash, near_blockchain, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
+use crate::{hash, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
 
 #[near_bindgen]
 impl NearPass {
@@ -18,30 +18,23 @@ impl NearPass {
         self.data_map.insert(&cur_data_id, &enc_pass);
 
         let mut acc_pass_ids = self.site_password_id_by_account.get(&account_id);
-        let cur_pass_index = self
-            .count_site_password_id_by_account
-            .get(&account_id)
-            .unwrap_or(0);
 
         // If the account id is not present, create one.
         if acc_pass_ids.is_none() {
-            acc_pass_ids = Option::Some(LookupMap::new(
+            acc_pass_ids = Option::Some(UnorderedSet::new(
                 StorageKey::SitePasswordIdByAccountInner {
                     account_id_hash: hash::hash_account_id(&account_id),
                 }
                 .try_to_vec()
                 .unwrap(),
             ));
-            self.site_password_id_by_account
-                .insert(&account_id, acc_pass_ids.as_ref().unwrap());
         }
 
         // Record the new site password for the account.
         let mut acc_pass_ids = acc_pass_ids.unwrap();
-        acc_pass_ids.insert(&cur_pass_index, &cur_data_id);
-        // Increment the count.
-        self.count_site_password_id_by_account
-            .insert(&account_id, &(cur_pass_index + 1));
+        acc_pass_ids.insert(&cur_data_id);
+        self.site_password_id_by_account
+            .insert(&account_id, &acc_pass_ids);
 
         return cur_data_id;
     }
@@ -51,7 +44,7 @@ impl NearPass {
         &self,
         account_id: &AccountId,
         pass_id: DataId,
-    ) -> LookupMap<u64, DataId> {
+    ) -> UnorderedSet<DataId> {
         let account = self.site_password_id_by_account.get(&account_id);
         // The error will just respond with a typical 404 error to obfuscate if an account exists
         // or it owns the password.
@@ -62,7 +55,7 @@ impl NearPass {
 
         let account = account.unwrap();
         assert!(
-            account.get(&pass_id).is_some(),
+            account.contains(&pass_id),
             "NearpassNoSitePass: No site password found"
         );
 
@@ -106,17 +99,7 @@ impl NearPass {
     /// Gets all the password ids for a given account.
     pub fn get_all_site_password_ids(&self, account_id: String) -> Option<Vec<DataId>> {
         let pass_ids = self.site_password_id_by_account.get(&account_id)?;
-        let pass_id_count = self
-            .count_site_password_id_by_account
-            .get(&account_id)
-            .unwrap_or(0);
-
-        Some(
-            (0..pass_id_count)
-                .into_iter()
-                .map(|index| pass_ids.get(&index).unwrap())
-                .collect(),
-        )
+        Some(pass_ids.to_vec())
     }
 
     /// Gets all the encrypted passwords for the given ids for an account.
@@ -133,7 +116,7 @@ impl NearPass {
         let account = account.unwrap();
 
         // Check if all the pass_ids that are sent in the request are owned by the account.
-        let all_owned = pass_ids.iter().all(|it| account.get(it).is_some());
+        let all_owned = pass_ids.iter().all(|it| account.contains(it));
         assert!(all_owned, "NearpassNoSitePass: No site password found");
 
         pass_ids

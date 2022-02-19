@@ -1,5 +1,5 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::{LookupMap, UnorderedSet};
 use near_sdk::{env, near_bindgen, setup_alloc, AccountId, CryptoHash};
 
 mod hash;
@@ -22,16 +22,9 @@ pub struct NearPass {
     /// Counter for the data id.
     current_data_id: DataId,
     /// Collection of all password ids for each account.
-    /// Using LookupMap to store a list of PassId instead of UnorderedSet because
-    /// UnorderedSet does not iterate properly due to: https://github.com/near/near-sdk-rs/issues/733.
-    site_password_id_by_account: LookupMap<AccountId, LookupMap<u64, DataId>>,
-    /// Stores the count of password ids for each account. Need to store this because of reasons
-    /// above.
-    count_site_password_id_by_account: LookupMap<AccountId, u64>,
+    site_password_id_by_account: LookupMap<AccountId, UnorderedSet<DataId>>,
     /// Collection of all text data ids for each account.
-    text_id_by_account: LookupMap<AccountId, LookupMap<u64, DataId>>,
-    /// Stores the count of text ids for each account.
-    count_text_id_by_account: LookupMap<AccountId, u64>,
+    text_id_by_account: LookupMap<AccountId, UnorderedSet<DataId>>,
     /// Collection of all the encrypted data by their ids.
     data_map: LookupMap<DataId, EncryptedData>,
     /// Signatures of the accounts to verify to verify if an encryption key is associated with an
@@ -44,10 +37,8 @@ pub struct NearPass {
 pub enum StorageKey {
     SitePasswordIdByAccount,
     SitePasswordIdByAccountInner { account_id_hash: CryptoHash },
-    CountSitePasswordIdByAccount,
     TextIdByAccount,
     TextIdByAccountInner { account_id_hash: CryptoHash },
-    CountTextIdByAccount,
     DataMap,
     AccountSignature,
 }
@@ -59,15 +50,7 @@ impl Default for NearPass {
             site_password_id_by_account: LookupMap::new(
                 StorageKey::SitePasswordIdByAccount.try_to_vec().unwrap(),
             ),
-            count_site_password_id_by_account: LookupMap::new(
-                StorageKey::CountSitePasswordIdByAccount
-                    .try_to_vec()
-                    .unwrap(),
-            ),
             text_id_by_account: LookupMap::new(StorageKey::TextIdByAccount.try_to_vec().unwrap()),
-            count_text_id_by_account: LookupMap::new(
-                StorageKey::CountTextIdByAccount.try_to_vec().unwrap(),
-            ),
             data_map: LookupMap::new(StorageKey::DataMap.try_to_vec().unwrap()),
             account_signature: LookupMap::new(StorageKey::AccountSignature.try_to_vec().unwrap()),
         }
