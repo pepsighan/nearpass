@@ -29,9 +29,9 @@ pub struct NearPass {
     site_password_id_by_account_count: LookupMap<AccountId, u64>,
     /// Collection of all the encrypted passwords by their Ids.
     site_password: LookupMap<PassId, EncryptedSitePassword>,
-    /// Hashes of the accounts to verify what master password they used to encrypt
-    /// site passwords.
-    account_hash: LookupMap<AccountId, String>,
+    /// Signatures of the accounts to verify to verify if a private key is associated with an
+    /// account.
+    account_signature: LookupMap<AccountId, String>,
 }
 
 /// Helper structure for keys of the persistent collections.
@@ -41,7 +41,7 @@ pub enum StorageKey {
     SitePasswordIdByAccountInner { account_id_hash: CryptoHash },
     SitePasswordIdByAccountCount,
     SitePassword,
-    AccountHash,
+    AccountSignature,
 }
 
 impl Default for NearPass {
@@ -57,30 +57,30 @@ impl Default for NearPass {
                     .unwrap(),
             ),
             site_password: LookupMap::new(StorageKey::SitePassword.try_to_vec().unwrap()),
-            account_hash: LookupMap::new(StorageKey::AccountHash.try_to_vec().unwrap()),
+            account_signature: LookupMap::new(StorageKey::AccountSignature.try_to_vec().unwrap()),
         }
     }
 }
 
 #[near_bindgen]
 impl NearPass {
-    /// Initializes the account hash for the very first time. Does not update once initialized.
-    pub fn initialize_account_hash(&mut self, hash: String) {
+    /// Initializes the account signature for the very first time.
+    pub fn initialize_account_signature(&mut self, signature: String) {
         let account_id = env::signer_account_id();
-        let saved_hash = self.account_hash.get(&account_id);
+        let saved_hash = self.account_signature.get(&account_id);
         assert!(
             saved_hash.is_none(),
-            "NearpassAlreadyInitialized: Cannot re-initialize account hash"
+            "NearpassAlreadyInitialized: Cannot re-initialize account signature"
         );
-        self.account_hash.insert(&account_id, &hash);
+        self.account_signature.insert(&account_id, &signature);
     }
 
-    /// Gets the hash for the account.
-    pub fn get_account_hash(&self, account_id: String) -> String {
-        let hash = self.account_hash.get(&account_id);
+    /// Gets the signature for the account.
+    pub fn get_account_signature(&self, account_id: String) -> String {
+        let hash = self.account_signature.get(&account_id);
         assert!(
             hash.is_some(),
-            "NearpassAccountNotInitialized: Account hash not initialized yet"
+            "NearpassAccountNotInitialized: Account signature not initialized yet"
         );
         hash.unwrap()
     }
@@ -259,20 +259,22 @@ mod tests {
         testing_env!(context);
 
         let mut contract = NearPass::default();
-        contract.initialize_account_hash("hash".to_string());
-        let hash = contract.get_account_hash(accound_id);
-        assert_eq!(hash, "hash");
+        contract.initialize_account_signature("sign".to_string());
+        let sign = contract.get_account_signature(accound_id);
+        assert_eq!(sign, "sign");
     }
 
     #[test]
-    #[should_panic(expected = "NearpassAccountNotInitialized: Account hash not initialized yet")]
+    #[should_panic(
+        expected = "NearpassAccountNotInitialized: Account signature not initialized yet"
+    )]
     fn get_account_hash_for_nonexistent_account() {
         let context = get_context(vec![], false);
         let accound_id = context.signer_account_id.to_string();
         testing_env!(context);
 
         let contract = NearPass::default();
-        contract.get_account_hash(accound_id);
+        contract.get_account_signature(accound_id);
     }
 
     #[test]
