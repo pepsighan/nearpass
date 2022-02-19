@@ -2,7 +2,7 @@ use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LookupMap;
 use near_sdk::{env, near_bindgen, AccountId};
 
-use crate::{hash, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
+use crate::{hash, near_blockchain, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
 
 #[near_bindgen]
 impl NearPass {
