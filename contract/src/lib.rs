@@ -29,7 +29,7 @@ pub struct NearPass {
     site_password_id_by_account_count: LookupMap<AccountId, u64>,
     /// Collection of all the encrypted passwords by their Ids.
     site_password: LookupMap<PassId, EncryptedSitePassword>,
-    /// Signatures of the accounts to verify to verify if a private key is associated with an
+    /// Signatures of the accounts to verify to verify if an encryption key is associated with an
     /// account.
     account_signature: LookupMap<AccountId, String>,
 }
