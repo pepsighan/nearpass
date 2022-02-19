@@ -14,7 +14,7 @@ impl NearPass {
         let cur_data_id = self.current_data_id;
         self.current_data_id += 1;
 
-        // Add the site password.
+        // Add the text.
         self.data_map.insert(&cur_data_id, &enc_text);
 
         let mut acc_text_ids = self.text_id_by_account.get(&account_id);
@@ -43,8 +43,7 @@ impl NearPass {
         return cur_data_id;
     }
 
-    /// Panics if the site password is not owned by the account.
-    /// Returns account if it is needed by the caller.
+    /// Panics if the text not owned by the account.
     fn panic_if_account_invalid_for_text(
         &self,
         account_id: &AccountId,

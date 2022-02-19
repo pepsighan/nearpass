@@ -47,7 +47,6 @@ impl NearPass {
     }
 
     /// Panics if the site password is not owned by the account.
-    /// Returns account if it is needed by the caller.
     fn panic_if_account_invalid_for_site_password(
         &self,
         account_id: &AccountId,
