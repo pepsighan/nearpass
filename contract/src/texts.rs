@@ -126,3 +126,91 @@ impl NearPass {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use near_sdk::testing_env;
+    use near_sdk::MockedBlockchain;
+
+    use super::*;
+
+    #[test]
+    fn add_text() {
+        let context = crate::tests::get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        let text_id = contract.add_text("encrypted_text".to_string());
+
+        let enc_text = contract.get_text(accound_id, text_id);
+        assert_eq!(enc_text, "encrypted_text");
+    }
+
+    #[test]
+    fn update_text() {
+        let context = crate::tests::get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        let text_id = contract.add_text("encrypted_text".to_string());
+
+        let enc_text = contract.get_text(accound_id.clone(), text_id);
+        assert_eq!(enc_text, "encrypted_text");
+
+        // Update the text.
+        contract.update_text(text_id, "new_encrypted_text".to_string());
+
+        let new_enc_text = contract.get_text(accound_id, text_id);
+        assert_eq!(new_enc_text, "new_encrypted_text");
+    }
+
+    #[test]
+    #[should_panic(expected = "NearpassNoText: No text found")]
+    fn delete_text() {
+        let context = crate::tests::get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        let text_id = contract.add_text("encrypted_text".to_string());
+
+        let enc_text = contract.get_text(accound_id.clone(), text_id);
+        assert_eq!(enc_text, "encrypted_text");
+
+        // Delete the text.
+        contract.delete_text(text_id);
+
+        // Check if it is deleted.
+        contract.get_text(accound_id, text_id);
+    }
+
+    #[test]
+    fn get_all_text_ids() {
+        let context = crate::tests::get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        contract.add_text("encrypted_text".to_string());
+        contract.add_text("new_encrypted_text".to_string());
+
+        let text_ids = contract.get_all_text_ids(accound_id);
+        assert_eq!(text_ids, Some(vec![0, 1]));
+    }
+
+    #[test]
+    fn get_texts_by_ids() {
+        let context = crate::tests::get_context(vec![], false);
+        let accound_id = context.signer_account_id.to_string();
+        testing_env!(context);
+
+        let mut contract = NearPass::default();
+        contract.add_text("encrypted_text".to_string());
+        contract.add_text("new_encrypted_text".to_string());
+
+        let enc_texts = contract.get_texts_by_ids(accound_id, vec![0, 1]);
+        assert_eq!(enc_texts, vec!["encrypted_text", "new_encrypted_text"]);
+    }
+}
