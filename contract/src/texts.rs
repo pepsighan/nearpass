@@ -1,6 +1,6 @@
 use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LookupMap;
-use near_sdk::{env, near_bindgen};
+use near_sdk::{env, near_bindgen, AccountId};
 
 use crate::{hash, DataId, EncryptedData, NearPass, NearPassContract, StorageKey};
 
@@ -41,5 +41,88 @@ impl NearPass {
             .insert(&account_id, &(cur_text_index + 1));
 
         return cur_data_id;
+    }
+
+    /// Panics if the site password is not owned by the account.
+    /// Returns account if it is needed by the caller.
+    fn panic_if_account_invalid_for_text(
+        &self,
+        account_id: &AccountId,
+        text_id: DataId,
+    ) -> LookupMap<u64, DataId> {
+        let account = self.text_id_by_account.get(&account_id);
+        assert!(account.is_some(), "NearpassNoText: No text found");
+
+        let account = account.unwrap();
+        assert!(
+            account.get(&text_id).is_some(),
+            "NearpassNoText: No text found"
+        );
+
+        account
+    }
+
+    /// Gets the text for the account referenced by the text id.
+    pub fn get_text(&self, account_id: String, text_id: DataId) -> EncryptedData {
+        self.panic_if_account_invalid_for_text(&account_id, text_id);
+
+        let text = self.data_map.get(&text_id);
+        assert!(text.is_some(), "NearpassNoText: No text found");
+
+        text.unwrap()
+    }
+
+    /// Updates the pre-existing text for the account.
+    pub fn update_text(&mut self, text_id: DataId, enc_text: EncryptedData) {
+        let account_id = env::signer_account_id();
+        self.panic_if_account_invalid_for_text(&account_id, text_id);
+
+        // Overwrite the pre-existing text.
+        self.data_map.insert(&text_id, &enc_text);
+    }
+
+    /// Deletes a text if it exists.
+    pub fn delete_text(&mut self, text_id: DataId) {
+        let account_id = env::signer_account_id();
+        let mut account = self.panic_if_account_invalid_for_text(&account_id, text_id);
+
+        // Remove the text from the account.
+        account.remove(&text_id);
+
+        // Remove from storage as well.
+        self.data_map.remove(&text_id);
+    }
+
+    /// Gets all the text ids for a given account.
+    pub fn get_all_text_ids(&self, account_id: String) -> Option<Vec<DataId>> {
+        let text_ids = self.text_id_by_account.get(&account_id)?;
+        let text_id_count = self.count_text_id_by_account.get(&account_id).unwrap_or(0);
+
+        Some(
+            (0..text_id_count)
+                .into_iter()
+                .map(|index| text_ids.get(&index).unwrap())
+                .collect(),
+        )
+    }
+
+    /// Gets all the text for the given ids for an account.
+    pub fn get_texts_by_ids(
+        &self,
+        account_id: String,
+        text_ids: Vec<DataId>,
+    ) -> Vec<EncryptedData> {
+        let account = self.text_id_by_account.get(&account_id);
+        assert!(account.is_some(), "NearpassNoText: No text found");
+        let account = account.unwrap();
+
+        // Check if all the text ids that are sent in the request are owned by the account.
+        let all_owned = text_ids.iter().all(|it| account.get(it).is_some());
+        assert!(all_owned, "NearpassNoText: No text found");
+
+        text_ids
+            .iter()
+            .map(|it| self.data_map.get(it).unwrap())
+            .collect()
     }
 }
