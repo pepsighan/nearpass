@@ -100,21 +100,21 @@ impl NearPass {
         let account_id = env::signer_account_id();
         env::log(format!("Add a site password for account '{}'", account_id).as_bytes());
 
-        let cur_pass_id = self.current_data_id;
+        let cur_data_id = self.current_data_id;
         self.current_data_id += 1;
 
         // Add the site password.
-        self.data_map.insert(&cur_pass_id, &enc_pass);
+        self.data_map.insert(&cur_data_id, &enc_pass);
 
-        let mut account_site_passes = self.site_password_id_by_account.get(&account_id);
-        let site_pass_count = self
+        let mut acc_pass_ids = self.site_password_id_by_account.get(&account_id);
+        let cur_pass_index = self
             .count_site_password_id_by_account
             .get(&account_id)
             .unwrap_or(0);
 
         // If the account id is not present, create one.
-        if account_site_passes.is_none() {
-            account_site_passes = Option::Some(LookupMap::new(
+        if acc_pass_ids.is_none() {
+            acc_pass_ids = Option::Some(LookupMap::new(
                 StorageKey::SitePasswordIdByAccountInner {
                     account_id_hash: hash::hash_account_id(&account_id),
                 }
@@ -122,17 +122,54 @@ impl NearPass {
                 .unwrap(),
             ));
             self.site_password_id_by_account
-                .insert(&account_id, account_site_passes.as_ref().unwrap());
+                .insert(&account_id, acc_pass_ids.as_ref().unwrap());
         }
 
         // Record the new site password for the account.
-        let mut account_site_passes = account_site_passes.unwrap();
-        account_site_passes.insert(&site_pass_count, &cur_pass_id);
+        let mut acc_pass_ids = acc_pass_ids.unwrap();
+        acc_pass_ids.insert(&cur_pass_index, &cur_data_id);
         // Increment the count.
         self.count_site_password_id_by_account
-            .insert(&account_id, &(site_pass_count + 1));
+            .insert(&account_id, &(cur_pass_index + 1));
 
-        return cur_pass_id;
+        return cur_data_id;
+    }
+
+    /// Add a text for the account.
+    pub fn add_text(&mut self, enc_data: EncryptedData) -> DataId {
+        let account_id = env::signer_account_id();
+        env::log(format!("Add a text for account '{}'", account_id).as_bytes());
+
+        let cur_data_id = self.current_data_id;
+        self.current_data_id += 1;
+
+        // Add the site password.
+        self.data_map.insert(&cur_data_id, &enc_data);
+
+        let mut acc_text_ids = self.text_id_by_account.get(&account_id);
+        let cur_text_index = self.count_text_id_by_account.get(&account_id).unwrap_or(0);
+
+        // If the account id is not present, create one.
+        if acc_text_ids.is_none() {
+            acc_text_ids = Option::Some(LookupMap::new(
+                StorageKey::TextIdByAccountInner {
+                    account_id_hash: hash::hash_account_id(&account_id),
+                }
+                .try_to_vec()
+                .unwrap(),
+            ));
+            self.text_id_by_account
+                .insert(&account_id, acc_text_ids.as_ref().unwrap());
+        }
+
+        // Record a new text for the account.
+        let mut acc_text_ids = acc_text_ids.unwrap();
+        acc_text_ids.insert(&cur_text_index, &cur_data_id);
+        // Increment the count.
+        self.count_text_id_by_account
+            .insert(&account_id, &(cur_text_index + 1));
+
+        return cur_data_id;
     }
 
     /// Panics if the site password is not owned by the account.
