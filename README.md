@@ -3,7 +3,8 @@ Nearpass
 
 Open-source, decentralized and private password manager built on NEAR Protocol.
 
-This project contains a smart contract for the Nearpass app built using [Rust] and [create-near-app].
+This project contains a smart contract for the Nearpass app built using [Rust] and [create-near-app]. If you are looking for 
+the extension (frontend) for this dapp, visit [nearpass-ext repo](https://github.com/pepsighan/nearpass-ext).
 
 Quick Start
 ===========
